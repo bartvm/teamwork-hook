@@ -32,8 +32,21 @@ function checkSuccess(error, response, body) {
 }
 
 app.post('/', function (req, res) {
+  // Figure out whether it is Pylearn2 or Theano
+  var prefix = req.body['repository']['name'].substr(0, 2).toUpperCase()
+  var taskList
+  if (prefix == 'PY') {
+    taskList = 391086
+  } else if (prefix == 'TH') {
+    taskList = 391468
+  } else {
+    console.log('Received request from unknown repository:' +
+                req.body['repository']['name'])
+  }
   if (req.headers['x-github-event'] == 'issues') {
-    if (req.body['label']['name'] === 'CCW') {
+    if (req.body['issue']['labels'].some(function(label) {
+      return label['name'] === 'CCW'
+    })) {
       // TASK 1: Add the issue as a task
       if (req.body['action'] === 'labeled' &&
           req.body['issue']['state'] === 'open') {
@@ -42,15 +55,16 @@ app.post('/', function (req, res) {
         teamworkRequest('/tasks.json', 'GET', {
             'includeCompletedTasks': true
           }, function(error, response, body) {
+          checkSuccess(error, response, body)
           if (!body['todo-items'].some(function(todo) {
             return todo['content'].indexOf(
-              req.body['issue']['number'] + ' ') === 1 
+              prefix + '-' + req.body['issue']['number'] + ' ') === 1 
           })) {
             // Add the task to Teamwork.com
-            teamworkRequest('/tasklists/391086/tasks.json', 'POST', {
+            teamworkRequest('/tasklists/' + taskList + '/tasks.json', 'POST', {
               'todo-item': {
-                'content': '#' + req.body['issue']['number'] + ' ' +
-                           req.body['issue']['title'],
+                'content': '#' + prefix  + '-' + req.body['issue']['number'] +
+                           ' ' + req.body['issue']['title'],
                 'description': req.body['issue']['html_url']
               }
             }, checkSuccess)
@@ -61,9 +75,10 @@ app.post('/', function (req, res) {
         console.log('Closing issue #' + req.body['issue']['number'])
         teamworkRequest('/tasks.json', 'GET', undefined,
                         function(error, response, body) {
+          checkSuccess(error, response, body)
           task = body['todo-items'].find(function(todo) {
             return todo['content'].indexOf(
-              req.body['issue']['number'] + ' ') === 1 
+              prefix + '-' + req.body['issue']['number'] + ' ') === 1 
           })
           if (task !== undefined) {
             teamworkRequest('/tasks/' + task['id'] + '/complete.json', 'PUT',
@@ -74,19 +89,19 @@ app.post('/', function (req, res) {
     }
   } else if (req.headers['x-github-event'] === 'issue_comment') {
     if (req.body['issue']['labels'].some(function(label) {
-      return label.name.indexOf('CCW') === 0
+      return label['name'] === 'CCW'
     }) && req.body['comment']['body'].toLowerCase().indexOf('/ccw') > -1) {
       // TASK 3: Make comments
       console.log("Making comment on issue #" + req.body['issue']['number'])
       teamworkRequest('/tasks.json', 'GET', {
           'includeCompletedTasks': true
         }, function(error, response, body) {
+        checkSuccess(error, response, body)
         task = body['todo-items'].find(function(todo) {
           return todo['content'].indexOf(
-            req.body['issue']['number'] + ' ') === 1 
+            prefix + ' - ' + req.body['issue']['number'] + ' ') === 1 
         })
         if (task !== undefined) {
-          // Add the task to Teamwork.com
           teamworkRequest('/tasks/' + task['id'] + '/comments.json', 'POST', {
             'comment': {
               'body': '@' + req.body['comment']['user']['login'] + ': ' +

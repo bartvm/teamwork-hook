@@ -1,0 +1,17 @@
+{
+  "name": "ccw-hook",
+  "version": "1.0.0",
+  "description": "Hook that integrates GitHub with Teamwork.com",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Bart van Merriënboer",
+  "license": "MIT",
+  "dependencies": {
+    "array.prototype.find": "^1.0.0",
+    "body-parser": "^1.9.3",
+    "express": "^4.10.4",
+    "request": "^2.48.0"
+  }
+}

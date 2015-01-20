@@ -42,49 +42,51 @@ app.post('/', function (req, res) {
     console.log('Received request from unknown repository:' +
                 req.body['repository']['name'])
   }
+
+  // Deal with issues opening/closing
   if (req.headers['x-github-event'] == 'issues') {
-    if (req.body['issue']['labels'].some(function(label) {
+    // TASK 1: Add the issue as a task
+    if (req.body['action'] === 'labeled' &&
+        req.body['issue']['state'] === 'open' &&
+        req.body['label']['name'] == 'CCW') {
+      console.log('Adding issue #' + req.body['issue']['number'])
+      // Check whether the task exists on Teamwork.com already
+      teamworkRequest('/tasks.json', 'GET', {
+          'includeCompletedTasks': true
+        }, function(error, response, body) {
+        checkSuccess(error, response, body)
+        if (!body['todo-items'].some(function(todo) {
+          return todo['content'].indexOf(
+            prefix + '-' + req.body['issue']['number'] + ' ') === 1
+        })) {
+          // Add the task to Teamwork.com
+          teamworkRequest('/tasklists/' + taskList + '/tasks.json', 'POST', {
+            'todo-item': {
+              'content': '#' + prefix  + '-' + req.body['issue']['number'] +
+                         ' ' + req.body['issue']['title'],
+              'description': req.body['issue']['html_url']
+            }
+          }, checkSuccess)
+        }
+      })
+    } else if (req.body['action'] === 'closed' &&
+               req.body['issue']['labels'].some(function(label) {
       return label['name'] === 'CCW'
     })) {
-      // TASK 1: Add the issue as a task
-      if (req.body['action'] === 'labeled' &&
-          req.body['issue']['state'] === 'open') {
-        console.log('Adding issue #' + req.body['issue']['number'])
-        // Check whether the task exists on Teamwork.com already
-        teamworkRequest('/tasks.json', 'GET', {
-            'includeCompletedTasks': true
-          }, function(error, response, body) {
-          checkSuccess(error, response, body)
-          if (!body['todo-items'].some(function(todo) {
-            return todo['content'].indexOf(
-              prefix + '-' + req.body['issue']['number'] + ' ') === 1 
-          })) {
-            // Add the task to Teamwork.com
-            teamworkRequest('/tasklists/' + taskList + '/tasks.json', 'POST', {
-              'todo-item': {
-                'content': '#' + prefix  + '-' + req.body['issue']['number'] +
-                           ' ' + req.body['issue']['title'],
-                'description': req.body['issue']['html_url']
-              }
-            }, checkSuccess)
-          }
+      // TASK 2: Close the task on teamwork.com
+      console.log('Closing issue #' + req.body['issue']['number'])
+      teamworkRequest('/tasks.json', 'GET', undefined,
+                      function(error, response, body) {
+        checkSuccess(error, response, body)
+        tasks = body['todo-items'].filter(function(todo) {
+          return todo['content'].indexOf(
+            prefix + '-' + req.body['issue']['number'] + ' ') === 1
         })
-      } else if (req.body['action'] === 'closed') {
-        // TASK 2: Close the task on teamwork.com
-        console.log('Closing issue #' + req.body['issue']['number'])
-        teamworkRequest('/tasks.json', 'GET', undefined,
-                        function(error, response, body) {
-          checkSuccess(error, response, body)
-          tasks = body['todo-items'].filter(function(todo) {
-            return todo['content'].indexOf(
-              prefix + '-' + req.body['issue']['number'] + ' ') === 1 
-          })
-          for (var i = 0; i < tasks.length; i++) {
-            teamworkRequest('/tasks/' + tasks[i]['id'] + '/complete.json', 'PUT',
-                            undefined, checkSuccess)
-          }
-        })
-      } 
+        for (var i = 0; i < tasks.length; i++) {
+          teamworkRequest('/tasks/' + tasks[i]['id'] + '/complete.json', 'PUT',
+                          undefined, checkSuccess)
+        }
+      })
     }
   } else if (req.headers['x-github-event'] === 'issue_comment') {
     if (req.body['issue']['labels'].some(function(label) {

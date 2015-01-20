@@ -1,7 +1,6 @@
 var express = require('express')        // For responding to webhooks
 var request = require('request')        // For sending requests
 var bodyParser = require('body-parser') // Parsing JSON
-require('array.prototype.find')         // To find tasks in arrays
 
 var app = express()
 app.use(bodyParser.json())
@@ -14,7 +13,7 @@ function teamworkRequest(uri, method, data, callback) {
     'uri': 'https://lisalab.teamwork.com' + uri,
     'auth': {
       'user': '',  // API key
-      'pass': 'X', // Random value
+      'pass': '', // Random value
       'sendImmediately': false
     },
     'json': true,
@@ -76,12 +75,12 @@ app.post('/', function (req, res) {
         teamworkRequest('/tasks.json', 'GET', undefined,
                         function(error, response, body) {
           checkSuccess(error, response, body)
-          task = body['todo-items'].find(function(todo) {
+          tasks = body['todo-items'].filter(function(todo) {
             return todo['content'].indexOf(
               prefix + '-' + req.body['issue']['number'] + ' ') === 1 
           })
-          if (task !== undefined) {
-            teamworkRequest('/tasks/' + task['id'] + '/complete.json', 'PUT',
+          for (var i = 0; i < tasks.length; i++) {
+            teamworkRequest('/tasks/' + tasks[i]['id'] + '/complete.json', 'PUT',
                             undefined, checkSuccess)
           }
         })
@@ -97,12 +96,12 @@ app.post('/', function (req, res) {
           'includeCompletedTasks': true
         }, function(error, response, body) {
         checkSuccess(error, response, body)
-        task = body['todo-items'].find(function(todo) {
+        tasks = body['todo-items'].filter(function(todo) {
           return todo['content'].indexOf(
-            prefix + ' - ' + req.body['issue']['number'] + ' ') === 1 
+            prefix + '-' + req.body['issue']['number'] + ' ') === 1 
         })
-        if (task !== undefined) {
-          teamworkRequest('/tasks/' + task['id'] + '/comments.json', 'POST', {
+        for (var i = 0; i < tasks.length; i++) {
+          teamworkRequest('/tasks/' + tasks[i]['id'] + '/comments.json', 'POST', {
             'comment': {
               'body': '@' + req.body['comment']['user']['login'] + ': ' +
                       req.body['comment']['body'] + "\n\n" +
